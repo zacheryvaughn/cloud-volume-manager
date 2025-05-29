@@ -16,6 +16,11 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = 1080;
 
+// Trust proxy headers (required for RunPod HTTPS proxy)
+app.set('trust proxy', true);
+
+// No need for protocol middleware - TUS server handles this with generateUrl
+
 // Serve static files from the public directory
 app.use(express.static("public"));
 
@@ -23,7 +28,7 @@ app.use(express.static("public"));
 app.use(express.json());
 
 // Get upload directory from environment variable or use default
-const uploadsDir = process.env.UPLOAD_BASE_DIR || "./uploads";
+const uploadsDir = process.env.MOUNT_PATH || "/workspace";
 console.log(`Upload directory set to: ${uploadsDir}`);
 
 // Create uploads directory if it doesn't exist
@@ -41,10 +46,24 @@ if (!fs.existsSync(initUploadDir)) {
 // Initialize the tus server with FileStore pointing to the staging directory
 const fileStore = new FileStore({ directory: initUploadDir });
 
-// Create the tus server
+// Create TUS server
 const tusServer = new Server({
   path: "/files",
-  datastore: fileStore
+  datastore: fileStore,
+  respectForwardedHeaders: true,
+  generateUrl: (req, { proto, host, path, id }) => {
+    // Force HTTPS if we detect RunPod proxy headers
+    const protocol = req.headers["x-forwarded-proto"] ||
+                    (req.headers["x-forwarded-host"] ? "https" : proto) ||
+                    "https";
+    
+    const hostname = req.headers["x-forwarded-host"] || req.headers.host || host;
+    const cleanPath = path.endsWith("/") ? path.slice(0, -1) : path;
+    
+    const url = `${protocol}://${hostname}${cleanPath}/${id}`;
+    console.log(`Generated TUS URL: ${url} (from headers: proto=${req.headers["x-forwarded-proto"]}, host=${req.headers["x-forwarded-host"]})`);
+    return url;
+  }
 });
 
 // Custom middleware to check for duplicate files before the upload starts

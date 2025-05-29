@@ -65,8 +65,11 @@ class UploadQueue {
      */
     uploadFile(queueItem) {
         return new Promise((resolve, reject) => {
+            const endpoint = `${window.location.protocol}//${window.location.host}/files/`;
+            console.log('TUS Upload endpoint:', endpoint);
+            
             const tusUpload = new tus.Upload(queueItem.file, {
-                endpoint: '/files/',
+                endpoint: endpoint,
                 chunkSize: 8 * 1024 * 1024, // 8MB chunks
                 retryDelays: [0, 1000, 3000, 5000],
                 metadata: {
