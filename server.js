@@ -37,7 +37,7 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Create initial upload directory for staging uploads
-const initUploadDir = path.join(uploadsDir, "INIT_UPLOAD_DIR");
+const initUploadDir = path.join(uploadsDir, "UPLOAD_STAGING_DIR");
 if (!fs.existsSync(initUploadDir)) {
   fs.mkdirSync(initUploadDir, { recursive: true });
   console.log(`Created initial upload directory: ${initUploadDir}`);
@@ -265,7 +265,7 @@ app.get("/api/files", async (req, res) => {
     
     // Map directory entries to file items, excluding the staging directory
     const fileItems = items
-      .filter(item => item.name !== 'INIT_UPLOAD_DIR') // Hide staging directory from users
+      .filter(item => item.name) // Hide staging directory from users
       .map(item => ({
         name: item.name,
         path: path.join(dirPath === "/" ? "" : dirPath, item.name).replace(/\\/g, "/"),
