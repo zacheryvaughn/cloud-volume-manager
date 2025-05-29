@@ -1,22 +1,24 @@
 import FileItem from './FileItem.js';
+import UploadQueue from './UploadQueue.js';
+import QueueItem from './QueueItem.js';
 
 /**
- * Handles file uploads using TUS protocol
+ * Handles file uploads using TUS protocol with queue support
  */
 class Uploader {
     constructor(container) {
         this.container = container;
         this.currentPath = '/';
-        this.isUploading = false;
-        this.currentUpload = null;
+        
+        // Queue system
+        this.uploadQueue = new UploadQueue();
+        this.queueItems = new Map(); // Map of queue item ID to QueueItem component
         
         // DOM elements
         this.fileInput = null;
         this.uploadBtn = null;
-        this.uploadProgress = null;
-        this.progressFill = null;
-        this.progressText = null;
         this.uploadPathSpan = null;
+        this.queueContainer = null;
         
         // Callbacks
         this.onUploadComplete = null;
@@ -40,15 +42,14 @@ class Uploader {
     createElements() {
         // File input
         this.fileInput = document.getElementById('file-input');
+        this.fileInput.setAttribute('multiple', true); // Enable multiple file selection
         
         // Upload button
         this.uploadBtn = document.getElementById('upload-btn');
         this.uploadPathSpan = document.getElementById('upload-path');
         
-        // Progress elements
-        this.uploadProgress = document.getElementById('upload-progress');
-        this.progressFill = document.getElementById('progress-fill');
-        this.progressText = document.getElementById('progress-text');
+        // Queue container
+        this.queueContainer = document.getElementById('queue-container');
     }
 
     /**
@@ -60,52 +61,76 @@ class Uploader {
             this.fileInput.click();
         });
 
-        // File selection
+        // File selection - now handles multiple files
         this.fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                this.startUpload(file);
+            const files = e.target.files;
+            if (files.length > 0) {
+                this.addFilesToQueue(files);
+                this.resetFileInput();
             }
         });
+
+        // Setup queue callbacks
+        this.setupQueueCallbacks();
     }
 
     /**
-     * Start uploading a file
+     * Setup upload queue callbacks
      */
-    startUpload(file) {
-        if (this.isUploading) return;
-        
-        this.isUploading = true;
-        this.showProgress();
-        this.updateProgress(0);
-        
-        // Create TUS upload
-        this.currentUpload = new tus.Upload(file, {
-            endpoint: '/files/',
-            chunkSize: 8 * 1024 * 1024, // 8MB chunks
-            retryDelays: [0, 1000, 3000, 5000],
-            metadata: {
-                filename: file.name,
-                filetype: file.type,
-                useOriginalFilename: 'true',
-                onDuplicateFiles: 'number',
-                path: this.getRelativePath()
-            },
-            onError: (error) => {
-                console.error('Upload failed:', error);
-                this.handleUploadError(error);
-            },
-            onProgress: (bytesUploaded, bytesTotal) => {
-                const percentage = Math.floor((bytesUploaded / bytesTotal) * 100);
-                this.updateProgress(percentage);
-            },
-            onSuccess: () => {
-                console.log('Upload completed:', this.currentUpload.url);
-                this.handleUploadSuccess();
+    setupQueueCallbacks() {
+        this.uploadQueue.onQueueUpdate = (queue) => {
+            this.updateQueueDisplay(queue);
+        };
+
+        this.uploadQueue.onUploadComplete = (queueItem) => {
+            if (this.onUploadComplete) {
+                this.onUploadComplete();
+            }
+        };
+
+        this.uploadQueue.onUploadError = (queueItem, error) => {
+            if (this.onError) {
+                this.onError(error.message || 'Upload failed');
+            }
+        };
+    }
+
+    /**
+     * Add files to the upload queue
+     */
+    addFilesToQueue(files) {
+        this.uploadQueue.addFiles(files, this.currentPath);
+    }
+
+    /**
+     * Update the queue display
+     */
+    updateQueueDisplay(queue) {
+        if (!this.queueContainer) return;
+
+        // Remove queue items that are no longer in the queue
+        this.queueItems.forEach((queueItem, id) => {
+            if (!queue.find(item => item.id === id)) {
+                queueItem.remove();
+                this.queueItems.delete(id);
             }
         });
 
-        this.currentUpload.start();
+        // Add or update queue items
+        queue.forEach(queueData => {
+            if (this.queueItems.has(queueData.id)) {
+                // Update existing item
+                this.queueItems.get(queueData.id).update(queueData);
+            } else {
+                // Create new item
+                const queueItem = new QueueItem(queueData, (id) => {
+                    this.uploadQueue.cancelUpload(id);
+                });
+                this.queueItems.set(queueData.id, queueItem);
+                this.queueContainer.appendChild(queueItem.getElement());
+            }
+        });
+
     }
 
     /**
@@ -116,58 +141,6 @@ class Uploader {
         return this.currentPath === '/' ? '' : this.currentPath.replace(/^\//, '');
     }
 
-    /**
-     * Show upload progress UI
-     */
-    showProgress() {
-        this.uploadBtn.classList.add('hidden');
-        this.uploadProgress.classList.remove('hidden');
-    }
-
-    /**
-     * Hide upload progress UI
-     */
-    hideProgress() {
-        this.uploadProgress.classList.add('hidden');
-        this.uploadBtn.classList.remove('hidden');
-    }
-
-    /**
-     * Update progress display
-     */
-    updateProgress(percentage) {
-        this.progressFill.style.width = `${percentage}%`;
-        this.progressText.textContent = `${percentage}%`;
-    }
-
-    /**
-     * Handle upload success
-     */
-    handleUploadSuccess() {
-        this.isUploading = false;
-        this.currentUpload = null;
-        this.hideProgress();
-        this.resetFileInput();
-        
-        if (this.onUploadComplete) {
-            this.onUploadComplete();
-        }
-    }
-
-    /**
-     * Handle upload error
-     */
-    handleUploadError(error) {
-        this.isUploading = false;
-        this.currentUpload = null;
-        this.hideProgress();
-        this.resetFileInput();
-        
-        const message = error.message || 'Upload failed';
-        if (this.onError) {
-            this.onError(message);
-        }
-    }
 
     /**
      * Reset the file input
@@ -193,23 +166,10 @@ class Uploader {
     }
 
     /**
-     * Cancel current upload
-     */
-    cancelUpload() {
-        if (this.currentUpload && this.isUploading) {
-            this.currentUpload.abort();
-            this.isUploading = false;
-            this.currentUpload = null;
-            this.hideProgress();
-            this.resetFileInput();
-        }
-    }
-
-    /**
-     * Check if currently uploading
+     * Check if queue has uploads
      */
     getIsUploading() {
-        return this.isUploading;
+        return !this.uploadQueue.isEmpty();
     }
 }
 

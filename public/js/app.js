@@ -95,7 +95,6 @@ class App {
         
         // Uploader callbacks
         this.uploader.onUploadComplete = () => {
-            console.log('Upload completed, waiting for server processing...');
             // Poll for file processing completion instead of using a fixed delay
             this.waitForFileProcessing(this.uploader.currentPath);
         };
@@ -233,9 +232,8 @@ class App {
                 if (response.ok) {
                     const files = await response.json();
                     
-                    // Check if file count has increased (new file appeared)
-                    if (files.length > initialFileCount) {
-                        console.log('File processing completed, refreshing column');
+                    // Check if file count has changed (either increased for new files, or decreased due to JSON cleanup)
+                    if (files.length !== initialFileCount) {
                         this.fileExplorer.refreshColumnByPath(uploadPath);
                         return;
                     }
@@ -248,7 +246,7 @@ class App {
             if (attempts < maxAttempts) {
                 setTimeout(pollForChanges, pollInterval);
             } else {
-                console.log('Max polling attempts reached, refreshing column anyway');
+                // Max attempts reached, refresh anyway
                 this.fileExplorer.refreshColumnByPath(uploadPath);
             }
         };

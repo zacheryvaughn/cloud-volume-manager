@@ -29,13 +29,10 @@ body {
     flex-shrink: 0;
 }
 
-.uploader-section {
-    padding: 16px;
-}
-
 .upload-btn {
-    width: 100%;
+    width: calc(100% - 28px);
     padding: 4px 8px;
+    margin: 14px;
     background: #1372d1;
     color: white;
     border: none;
@@ -48,30 +45,103 @@ body {
     transition: brightness 0.1s;
 }
 
-.upload-progress {
-    margin-top: 12px;
+/* Queue items */
+.queue-item {
+    padding: 10px 0px;
+    margin: 0px 10px;
+
+    border-top: 1px solid #424242;
+    font-size: 12px;
 }
 
-.progress-bar {
-    width: 100%;
-    height: 8px;
-    background: #444;
-    border-radius: 4px;
+.queue-item-content {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.queue-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.queue-item-name {
+    font-weight: 500;
+    white-space: nowrap;
     overflow: hidden;
-    margin-bottom: 8px;
+    text-overflow: ellipsis;
+    flex: 1;
+    margin-right: 4px;
 }
 
-.progress-fill {
+.queue-item-progress {
+    width: 100%;
+}
+
+.queue-progress-bar {
+    width: 100%;
+    height: 5px;
+    background: #444;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.queue-progress-fill {
     height: 100%;
-    background: #1478dc;
+    background: #0566e5;
+    border-radius: 10px;
     width: 0%;
     transition: width 0.3s ease;
 }
 
-.progress-text {
-    font-size: 12px;
-    text-align: center;
+.queue-status-text {
+    font-size: 11px;
+    color: #aaa;
+    line-height: 1.2;
+}
+
+.queue-cancel-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #aaaaaa;
+    border: none;
+    padding: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.queue-cancel-btn:hover {
+    background: #999999;
+}
+
+.queue-cancel-btn svg {
+    color: #363636;
+    width: 10px;
+    height: 10px;
     display: block;
+    margin: auto;
+}
+
+/* Queue item states */
+/* .queue-item-uploading {
+    background: #2d3748;
+}
+
+.queue-item-completed {
+    background: #2d5a2d;
+} */
+
+.queue-item-error {
+    background: #5a2d2d;
+}
+
+.queue-item-error .queue-status-text {
+    color: #ff6b6b;
 }
 
 /* Main content */
