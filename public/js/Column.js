@@ -89,10 +89,35 @@ class Column {
             try {
                 // Only start rename timer for selected items on left click
                 if (e.button === 0 && item && item.selected && !item.isRenaming) {
+                    // Store the mousedown position to detect drag vs click
+                    item._mouseDownX = e.clientX;
+                    item._mouseDownY = e.clientY;
+                    item._mouseDownTime = Date.now();
+                    item._isDragDetected = false;
                     item.startRenameTimer();
                 }
             } catch (error) {
                 console.error('Error in mousedown handler:', error);
+            }
+        });
+
+        element.addEventListener('mousemove', (e) => {
+            try {
+                // Detect if user is dragging (moved more than 5 pixels)
+                if (item && item._mouseDownX !== undefined && !item._isDragDetected) {
+                    const deltaX = Math.abs(e.clientX - item._mouseDownX);
+                    const deltaY = Math.abs(e.clientY - item._mouseDownY);
+                    
+                    if (deltaX > 5 || deltaY > 5) {
+                        item._isDragDetected = true;
+                        // Clear rename timer since user is dragging
+                        if (item.clearRenameTimer) {
+                            item.clearRenameTimer();
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error in mousemove handler:', error);
             }
         });
 
@@ -103,9 +128,17 @@ class Column {
                     return;
                 }
                 
-                // Clear rename timer on mouse up
-                if (item && item.clearRenameTimer) {
+                // Clear rename timer on mouse up only if no drag was detected
+                if (item && item.clearRenameTimer && !item._isDragDetected) {
                     item.clearRenameTimer();
+                }
+                
+                // Clean up drag detection variables
+                if (item) {
+                    item._mouseDownX = undefined;
+                    item._mouseDownY = undefined;
+                    item._mouseDownTime = undefined;
+                    item._isDragDetected = false;
                 }
             } catch (error) {
                 console.error('Error in mouseup handler:', error);
@@ -117,6 +150,14 @@ class Column {
                 // Clear rename timer when mouse leaves, but don't exit rename mode if already renaming
                 if (item && !item.isRenaming && item.clearRenameTimer) {
                     item.clearRenameTimer();
+                }
+                
+                // Clean up drag detection variables
+                if (item) {
+                    item._mouseDownX = undefined;
+                    item._mouseDownY = undefined;
+                    item._mouseDownTime = undefined;
+                    item._isDragDetected = false;
                 }
             } catch (error) {
                 console.error('Error in mouseleave handler:', error);
@@ -132,6 +173,11 @@ class Column {
 
         // Drag events
         element.addEventListener('dragstart', (e) => {
+            // Clear rename timer when drag starts
+            if (item && item.clearRenameTimer) {
+                item.clearRenameTimer();
+            }
+            
             if (this.onItemDragStart) {
                 this.onItemDragStart(e, item);
             }
