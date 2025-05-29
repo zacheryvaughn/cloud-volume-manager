@@ -31,8 +31,15 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Initialize the tus server with FileStore
-const fileStore = new FileStore({ directory: uploadsDir });
+// Create initial upload directory for staging uploads
+const initUploadDir = path.join(uploadsDir, "INIT_UPLOAD_DIR");
+if (!fs.existsSync(initUploadDir)) {
+  fs.mkdirSync(initUploadDir, { recursive: true });
+  console.log(`Created initial upload directory: ${initUploadDir}`);
+}
+
+// Initialize the tus server with FileStore pointing to the staging directory
+const fileStore = new FileStore({ directory: initUploadDir });
 
 // Create the tus server
 const tusServer = new Server({
@@ -142,8 +149,8 @@ tusServer.on(EVENTS.POST_FINISH, async (req, res, upload) => {
       }
       
       const originalFilePath = path.join(targetDir, originalFilename);
-      const uuidFilePath = path.join(uploadsDir, upload.id);
-      const jsonFilePath = path.join(uploadsDir, `${upload.id}.json`);
+      const uuidFilePath = path.join(initUploadDir, upload.id);
+      const jsonFilePath = path.join(initUploadDir, `${upload.id}.json`);
       
       console.log(`Target directory: ${targetDir}`);
       console.log(`Original filename: ${originalFilename}`);
@@ -237,12 +244,14 @@ app.get("/api/files", async (req, res) => {
     // Read the directory contents
     const items = await fs.promises.readdir(fullPath, { withFileTypes: true });
     
-    // Map directory entries to file items
-    const fileItems = items.map(item => ({
-      name: item.name,
-      path: path.join(dirPath === "/" ? "" : dirPath, item.name).replace(/\\/g, "/"),
-      isDirectory: item.isDirectory()
-    }));
+    // Map directory entries to file items, excluding the staging directory
+    const fileItems = items
+      .filter(item => item.name !== 'INIT_UPLOAD_DIR') // Hide staging directory from users
+      .map(item => ({
+        name: item.name,
+        path: path.join(dirPath === "/" ? "" : dirPath, item.name).replace(/\\/g, "/"),
+        isDirectory: item.isDirectory()
+      }));
     
     // Return the directory contents as JSON
     return res.json(fileItems);

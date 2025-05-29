@@ -233,8 +233,8 @@ class App {
                 if (response.ok) {
                     const files = await response.json();
                     
-                    // Check if file count has changed (file processing completed)
-                    if (files.length !== initialFileCount) {
+                    // Check if file count has increased (new file appeared)
+                    if (files.length > initialFileCount) {
                         console.log('File processing completed, refreshing column');
                         this.fileExplorer.refreshColumnByPath(uploadPath);
                         return;
